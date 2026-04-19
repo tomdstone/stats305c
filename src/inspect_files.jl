@@ -44,6 +44,7 @@ plot(
     label = missing
 )
 
+colors = reduce(vcat, [repeat([cond], size(data,2)) for (cond, data) in zip(p["condition"], p["spikes"]) ])
 
 pr = predict(w2, data_matrix2)
 
@@ -54,7 +55,6 @@ scatter(pr[12,:], pr[13, :], alpha=0.5, color = colors)
 
 # Kernel PCA
 
-colors = reduce(vcat, [repeat([cond], size(data,2)) for (cond, data) in zip(p["condition"], p["spikes"]) ])
 
 
 w3 = fit(KernelPCA, data_matrix2[:, 1:1000:end], maxoutdim=20, kernel = (x,y)->exp(-0.01*norm(x-y)^2.0), inverse=true)
@@ -67,3 +67,24 @@ scatter3d(preds[1,:], preds[2,:], preds[3,:], alpha = 0.5, group = colors[i:1000
 plot!([0,1],[0,0], [0,0], color = "red", label = "x")
 plot!([0,0],[0,1], [0,0], color = "blue", label = "y")
 plot!([0,0],[0,0], [0,1], color = "green", label = "z")
+
+
+# trying independent bernouli RVs to see what PCA looks like
+
+
+k = rand(Bernoulli(mean(data_matrix2)), 128, 100000)
+
+w2 = fit(PCA, k, maxoutdim=20)
+
+
+## Fitting ICA to the data
+
+
+r1 = fit(ICA, data_matrix2[:, 1:1000:end], 10)
+r1 = fit(ICA, k[:, 1:100:end], 10)
+
+
+
+## MDS
+
+M = fit(MDS, data_matrix2[:, 1:1000:end], maxoutdim=10, distances=false)
