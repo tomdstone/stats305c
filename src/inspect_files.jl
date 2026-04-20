@@ -1,7 +1,7 @@
 using Pkg
 Pkg.activate("Stats305c", shared=true)
 
-using MAT, Pickle, MultivariateStats, Plots, LinearAlgebra
+using MAT, Pickle, MultivariateStats, Plots, LinearAlgebra, Distributions
 
 # data source 1
 dir = "gdrive/doi-10.7281-t1-v73vza/SMA_Monkey"
@@ -35,6 +35,12 @@ data_matrix2 = Matrix{Float64}(reduce(hcat, p["spikes"]) )
 # PCA
 
 w2 = fit(PCA, data_matrix2, maxoutdim=20)
+
+
+i = 0
+
+i += 1
+histogram(abs.(w2.proj[:, i]), nbins=30)
 
 plot(
     100*cumsum(w2.prinvars / w2.tvar),
@@ -72,19 +78,70 @@ plot!([0,0],[0,0], [0,1], color = "green", label = "z")
 # trying independent bernouli RVs to see what PCA looks like
 
 
-k = rand(Bernoulli(mean(data_matrix2)), 128, 100000)
+k = rand(Bernoulli(mean(data_matrix2)), size(data_matrix2)) |> Matrix{Float16}
 
 w2 = fit(PCA, k, maxoutdim=20)
+
+i = 0
+
+i += 1
+histogram(abs.(w2.proj[:, i]), nbins=30)
 
 
 ## Fitting ICA to the data
 
 
 r1 = fit(ICA, data_matrix2[:, 1:1000:end], 10)
-r1 = fit(ICA, k[:, 1:100:end], 10)
+r1 = fit(ICA, k[:, 1:1000:end], 10)
 
 
 
 ## MDS
 
 M = fit(MDS, data_matrix2[:, 1:1000:end], maxoutdim=10, distances=false)
+
+
+
+
+
+## Binning into 20 ms windows
+
+function bin_by_factor(M::Matrix, f)
+    d, N = size(M)
+
+    n = N ÷ f
+
+    m = Matrix{UInt8}(undef, d, n)
+
+    for i in 1:n
+        m[:, i] .= sum(M[:, (f*(i-1)+1):(f*i)], dims=2)
+    end
+    return m
+end
+
+
+data_20ms = reduce(hcat, bin_by_factor.(p["spikes"], 20))
+
+u = fit(PCA, data_20ms, maxoutdim=20)
+
+plot(
+    100*cumsum(u.prinvars / u.tvar),
+    ylims = (0,100),
+    xlabel = "Principal Component",
+    ylabel = "Percent Variance Explained",
+    label = missing
+)
+
+
+i = 0
+
+i += 1
+histogram(abs.(u.proj[:, i]), nbins=30)
+
+
+
+## ICA on binned data
+
+# doesn't converge....
+
+r1 = fit(ICA, Matrix{Float32}(data_20ms), 10, maxiter = 10000)
