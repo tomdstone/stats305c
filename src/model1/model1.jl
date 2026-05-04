@@ -7,10 +7,37 @@ using Pickle
 using StatsPlots
 using Distributions
 using MultivariateStats
-using HiddenMarkovModels
+# using HiddenMarkovModels
 using Random
 
-p = Pickle.npyload("gdrive/mc_pacman.pkl")
+## --------- Model functions  ------------
+
+mutable struct MD_Model{T<:AbstractFloat}
+    A::AbstractMatrix{T}
+    C::AbstractMatrix{T}
+    H::AbstractMatrix{T}
+    Kmax::Int64
+    k₀::Vector{T}
+    z₀::Vector{T}
+    Σ₀::AbstractMatrix{T}
+end
+
+nneuron = 128
+nstate = 256
+Kmax = 10
+
+trans_matrix = rand(Kmax, Kmax)
+trans_matrix ./= sum(trans_matrix, dims=2)
+
+model = MD_Model(
+    randn(nstate, nstate),
+    randn(nneuron, nstate),
+    trans_matrix,
+    Kmax,
+    zeros(Kmax),
+    zeros(nneuron),
+    I(nneuron) |> Matrix{Float64}
+)
 
 function assemble_first_k_tensor(C, kmax; T=Float64)
     u, s, v = svd(C)
@@ -25,91 +52,59 @@ function assemble_first_k_tensor(C, kmax; T=Float64)
 end
 
 
-function initialize_vardim_obs_models(;
-    nneuron = 128,
-    nstate = 256,
-    kmax = 10,
-    T = Float64
-)
+function assemble_HMM(m::MD_Model{T}, Cs = nothing) where T
+    nneuron, nstate = size(m.C)
 
-    C_init = randn(T, nneuron, nstate)
-    Cs = assemble_first_k_tensor(C_init, kmax; T)
+    if isnothing(Cs)
+        Cs = assemble_first_k_tensor(m.C, m.Kmax; T)
+    end
 
     obsmodels = EmissionModel[
         PoissonRegressionEmission(
             nstate, nneuron, Cs[:,:,k], true, 0.
-        ) for k in 1:kmax
+        ) for k in 1:m.Kmax
     ]
 
-    return obsmodels
-end
-
-function initialize_vardim_hmm(;
-    nneuron = 128,
-    nstate = 256,
-    kmax = 10,
-    T = Float64
-)
-    # WARNING: not sure if rows or cols...?
-    trans_matrix = rand(nstate, nstate)
-    trans_matrix ./= sum(trans_matrix, dims=1)
-
-    obsmodels = initialize_vardim_obs_models(; nneuron, nstate, kmax, T)
-
-    initial_state_prior = ones(nstate) / nstate
-
-    return HiddenMarkovModel(trans_matrix, obsmodels, initial_state_prior, kmax)
+    return HiddenMarkovModel(m.H, obsmodels, m.k₀, m.Kmax)
 end
 
 
 
-function bin_by_factor(M::Matrix, f)
-    d, N = size(M)
 
-    n = N ÷ f
 
-    m = Matrix{UInt8}(undef, d, n)
+function estimate_hidden_z(m::MD_Model{T}, xs, k_ests) where T
 
-    for i in 1:n
-        m[:, i] .= sum(M[:, (f*(i-1)+1):(f*i)], dims=2)
+end
+
+function estimate_hidden_k(m::MD_Model{T}, xs, z_ests) where T
+
+end
+
+function update_A!(m::MD_Model{T}, xs, k_ests, z_ests) where T
+
+end
+
+function update_C!(m::MD_Model{T}, xs, k_ests, z_ests) where T
+
+end
+
+# TODO: how to generally force prior on H
+# NOTE: k_ests is multiple trials of data!!!!
+function update_H!(m::MD_Model{T}, xs, k_ests, z_ests) where T
+
+    # H = zeros(T, m.Kmax, m.Kmax)
+    H = ones(T, m.Kmax, m.Kmax) # enforcing a prior that every transition is possible
+
+    for k_seq in k_ests
+        for t in 2:length(k_seq)
+            k_t = k_seq[t]
+            k_tmin1 = k_seq[t-1]
+
+            H[k_tmin1, k_t] += one(T)
+        end
     end
-    return m
+
+    m.H .= H ./ sum(H, dims=2)
+
+    return nothing
 end
-
-
-data_20ms = Matrix{Float64}.(bin_by_factor.([(x) for (i,x) in enumerate(p["spikes"]) if p["condition"][i] == 1], 20))
-
-
-# fit!(hmm, data_20ms)
-
-
-
-# With hidden states, can fit regression models!
-
-using StateSpaceDynamics, Random, LinearAlgebra
-nneuron = 16
-nhidden = 32
-nstate  = 10
-
-trans_matrix = rand(nstate, nstate)
-trans_matrix ./= sum(trans_matrix, dims=2)
-
-# trans_matrix = zeros(10,10)
-# for i in 1:10
-#     trans_matrix[i, i:end] .= 1 / (10-i+1)
-# end
-
-obsmodels = [
-    PoissonRegressionEmission(
-        nhidden, nneuron, randn(nhidden, nneuron), false, 0.
-    ) for k in 1:nstate
-]
-
-hmm = HiddenMarkovModel(trans_matrix, obsmodels, ones(nstate) / nstate, nstate)
-
-neuron_data = rand(Poisson(0.1), nneuron, 100) .|> Float64
-hidden_data = rand(MvNormal(zeros(nhidden), 0.01I), 100)
-
-rand(hmm, hidden_data, n=10)
-
-StateSpaceDynamics.fit!(hmm, neuron_data, hidden_data)

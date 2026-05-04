@@ -1,7 +1,8 @@
 using Pkg
 Pkg.activate("Stats305c", shared=true)
 
-using MAT, Pickle, MultivariateStats, Plots, LinearAlgebra, Distributions
+using MAT, Pickle, MultivariateStats, Plots, LinearAlgebra, Distributions, StatsPlots
+default(fontfamily = "Computer Modern")
 
 # data source 1
 dir = "gdrive/doi-10.7281-t1-v73vza/SMA_Monkey"
@@ -40,7 +41,7 @@ w2 = fit(PCA, data_matrix2, maxoutdim=20)
 i = 0
 
 i += 1
-histogram(abs.(w2.proj[:, i]), nbins=30)
+histogram(abs.(w2.proj[:, i]), nbins=30, label = nothing, title = "PC $i coordinate scales")
 
 plot(
     100*cumsum(w2.prinvars / w2.tvar),
@@ -50,14 +51,30 @@ plot(
     label = missing
 )
 
-colors = reduce(vcat, [repeat([cond], size(data,2)) for (cond, data) in zip(p["condition"], p["spikes"]) ])
+colors = reduce(vcat, [repeat([cond], size(data,2)) for (cond, data) in zip(p["condition"], p["spikes"])])
 
 pr = predict(w2, data_matrix2)
 
-scatter3d(pr[1,:], pr[2,:], pr[3, :], alpha=0.5, color = colors)
+# plot for milestone 2
+scatter3d(
+    pr[1,:],
+    pr[2,:],
+    pr[3,:],
+    alpha=0.5,
+    color = colors,
+    label = nothing,
+    title = "First three principal components",
+    xlabel = "PC 1",
+    ylabel = "PC 2",
+    zlabel = "PC 3",
+    fontfamily = "Computer Modern",
+)
+
 scatter3d(pr[11,:], pr[12,:], pr[13, :], alpha=0.5, color = colors)
 scatter(pr[12,:], pr[13, :], alpha=0.5, color = colors)
 
+
+# histogram(abs2.(w2.proj[:, 1:3][:]), nbins = 50, alpha = 0.5, label = ["PC 1" "PC 2" "PC 3"], fontfamily="Computer Modern", bar_position = :dodge)
 
 # Kernel PCA
 
