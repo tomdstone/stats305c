@@ -11,6 +11,8 @@ using Distributions
 using MultivariateStats
 using Random
 using ProgressBars
+using JLD2
+using Dates
 
 
 ## Loading data
@@ -18,6 +20,8 @@ using ProgressBars
 p = Pickle.npyload("gdrive/mc_pacman.pkl")
 
 ## Data processing
+
+# TODO: need to split into training and test sets
 
 function assemble_data(; p = p, Δt = 20, T = Float64)
     data = Dict()
@@ -58,15 +62,24 @@ function assemble_poglds(; nneuron = 128, nstate = 10, T = Float64)
         Matrix{T}(I(nstate))
     )
 
-    return LinearDynamicalSystem(gsm, pom, fit_bool = fill(true, 5))
+    return LinearDynamicalSystem(gsm, pom, fit_bool = [true, true, true, false, true]) # not state noise covariance
 end
 
 ## Fitting models
 
-models = Dict(i => assemble_poglds() for i in 1:8)
+data = assemble_data()
+
+models = Dict(i => assemble_poglds(nstate = 2) for i in 1:8)
 
 for i in ProgressBar(1:8)
-    fit!(models[i], data[i])
+    fit!(models[i], data[i][:,:,[1]]) # fitting on one timeseries to put together code for evaluation
+    # fit!(models[i], data[i])
 end
+
+## Saving results
+
+dtm = Dates.format(now(), dateformat"yyyy-mm-dd_HH-MM")
+
+jldsave("gdrive/models/pglds_statedim2_$dtm.jld2"; models)
 
 ## Evaluating model performance
