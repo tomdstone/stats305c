@@ -83,3 +83,7 @@ dtm = Dates.format(now(), dateformat"yyyy-mm-dd_HH-MM")
 jldsave("gdrive/models/pglds_statedim2_$dtm.jld2"; models)
 
 ## Evaluating model performance
+
+models = JLD2.load("gdrive/models/pglds_statedim2_2026-05-04_09-24.jld2")["models"]
+
+models[1]

@@ -1,3 +1,4 @@
+include("KalmanFilter.jl")
 
 function kfs_matmul(xs::AbstractMatrix{S}; params, EM = true) where S <: AbstractFloat
     A = params.A
@@ -98,3 +99,31 @@ function kfs_matmul(xs::AbstractMatrix{S}; params, EM = true) where S <: Abstrac
         return (; μ_t_T, Σ_t_T, μ_0_T, Σ_0_T)
     end
 end
+
+## Testing using oscillator model
+
+A = zeros(Float64, 4, 4)
+A[1:2,1:2] .= 0.95 * [cospi(2 * 10 / 200) -sinpi(2* 10 / 200); sinpi(2 * 10 / 200) cospi(2*10*200)]
+A[3:4,3:4] .= 0.99 * [cospi(2 * 60 / 200) -sinpi(2* 60 / 200); sinpi(2 * 60 / 200) cospi(2*60*200)]
+
+Q = I(4)
+C = [1. 0. 1. 0.]
+R = [1.;;]
+μ0 = zeros(Float64, 4)
+Σ0 = I(4)
+
+
+T = 10_000
+zs = rand(MvNormal(zeros(4), Q), T)
+zs[:, 1] .+= A * rand(MvNormal(μ0, Σ0))
+
+for t in 2:T
+    zs[:, t] .+= A * zs[:, t-1]
+end
+
+xs = C * zs + rand(MvNormal(zeros(1), R), T)
+
+a = kalman_filter_smoother(xs, params = (; A, Q, C, R, μ0, Σ0), EM=true)
+
+plot(a.μ_t_T[1, :])
+plot!(zs[1, :])
