@@ -150,7 +150,7 @@ for cond in 1:8
     file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
     pkl = Pickle.npyload(file)
 
-    test_data = reduce(hcat, pkl["fit"]["y_test"])
+    test_data = reduce(hcat, pkl["fit"]["y_test"]')
 
     pca = fit(PCA, test_data, maxoutdim = 20)
 
