@@ -169,13 +169,14 @@ for cond in 1:8
         preds[1,:],
         preds[2,:],
         alpha = 0.2,
-        label = nothing,
+        label = "Truth",
         xlabel = "PC 1",
         ylabel = "PC 2",
-        title = "Projection onto first two PCs Cond $cond truth"
+        title = "Projection onto first two PCs Cond $cond"
     )
 
     savefig(u, joinpath(img_folder, "cond$cond-2pcs.pdf"))
+
 
     for state in [8,12,18]
         dt = reshape(data[[cond, state]], (128, :))
@@ -187,9 +188,19 @@ for cond in 1:8
             label = state
         )
 
+        preds_orig = predict(pca, dt)
+
+        scatter!(
+            u,
+            preds_orig[1,:],
+            preds_orig[2,:],
+            label = state,
+            alpha = 0.2
+        )
+
         preds_state = predict(pca_state, dt)
 
-        u = scatter(
+        v = scatter(
             preds_state[1,:],
             preds_state[2,:],
             alpha = 0.2,
@@ -199,8 +210,9 @@ for cond in 1:8
             title = "Projection onto first two PCs Cond $cond State $state"
         )
 
-        savefig(u, joinpath(img_folder, "cond$cond-state$state-2pcs.pdf"))
+        savefig(v, joinpath(img_folder, "cond$cond-state$state-2pcs.pdf"))
     end
 
+    savefig(u, joinpath(img_folder, "cond$cond-2pcs-all.pdf"))
     savefig(t, joinpath(img_folder, "cond$cond-pca.pdf"))
 end
