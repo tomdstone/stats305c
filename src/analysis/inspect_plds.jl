@@ -60,7 +60,7 @@ for cond in 1:8, state in [8,12,18]
     data[[cond, state]] = generate_poisson_data(params; T, ntrials)
 end
 
-## Visualizations
+## Visualizing firing rates
 
 img_folder = "gdrive/images"
 
@@ -76,7 +76,7 @@ for cond in 1:8
         ylabel = "Neuron",
         clims = (0,10)
     )
-    savefig(p, joinpath(img_folder, "cond$cond-truth.pdf"))
+    savefig(p, joinpath(img_folder, "cond$cond-rate-truth.pdf"))
 
     for state in [8,12,18]
         mat = mean(data[[cond, state]], dims=3)[:,:,1]
@@ -87,12 +87,10 @@ for cond in 1:8
             ylabel = "Neuron",
             clims = (0,10)
         )
-        savefig(q, joinpath(img_folder, "cond$cond-state$state.pdf"))
+        savefig(q, joinpath(img_folder, "cond$cond-state$state-rate.pdf"))
     end
 
 end
-
-## Quant comparisons
 
 for cond in 1:8
     file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
@@ -114,5 +112,30 @@ for cond in 1:8
         )
     end
 
-    savefig(r, joinpath(img_folder, "cond$cond-ratehistogram.pdf"))
+    savefig(r, joinpath(img_folder, "cond$cond-rate-histogram.pdf"))
+end
+
+## Visualizing the transmission matrices
+
+for cond in 1:8, state in [8,12,18]
+    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state$(state)_steps100_seed7.pkl")
+
+    A = Pickle.npyload(file)["fit"]["trainable_params"]["A"]
+
+    ev = eigen(A)
+
+    s = scatter(
+        real(ev.values),
+        imag(ev.values),
+        label = nothing,
+        title = "Eigenvalues Cond $cond state $state",
+    )
+    plot!(
+        s,
+        cos.(range(0,2π, length=1000)),
+        sin.(range(0,2π, length=1000)),
+        label = nothing,
+        aspectratio=1
+    )
+    savefig(s, joinpath(img_folder, "cond$cond-state$state-evals.pdf"))
 end
