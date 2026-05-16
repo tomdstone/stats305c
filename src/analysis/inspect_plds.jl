@@ -62,7 +62,7 @@ end
 
 ## Visualizing firing rates
 
-img_folder = "gdrive/images"
+img_folder = "gdrive/images/tom"
 
 for cond in 1:8
     file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
@@ -70,9 +70,11 @@ for cond in 1:8
 
     mean_observed_rates = mean(stack(pkl["fit"]["y_test"]), dims=3)[:,:,1]
     p = heatmap(
+        20 .* axes(mean_observed_rates, 1),
+        1:128,
         mean_observed_rates',
         title = "Mean rate Condition $cond",
-        xlabel = "Bin",
+        xlabel = "Time (ms)",
         ylabel = "Neuron",
         clims = (0,10)
     )
@@ -81,9 +83,11 @@ for cond in 1:8
     for state in [8,12,18]
         mat = mean(data[[cond, state]], dims=3)[:,:,1]
         q = heatmap(
+            20 * axes(mat, 2),
+            1:128,
             mat,
             title = "Sim Condition $cond Nstate $state",
-            xlabel = "Bin",
+            xlabel = "Time (ms)",
             ylabel = "Neuron",
             clims = (0,10)
         )
@@ -138,4 +142,65 @@ for cond in 1:8, state in [8,12,18]
         aspectratio=1
     )
     savefig(s, joinpath(img_folder, "cond$cond-state$state-evals.pdf"))
+end
+
+## Look at PCA of the simulated data and compare
+
+for cond in 1:8
+    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
+    pkl = Pickle.npyload(file)
+
+    test_data = reduce(hcat, pkl["fit"]["y_test"])
+
+    pca = fit(PCA, test_data, maxoutdim = 20)
+
+    t = plot(
+        100cumsum(pca.prinvars / pca.tvar),
+        ylims = (0,100),
+        xlabel = "Principal Component",
+        ylabel = "Percent Variance Explained",
+        label = "Ground Truth",
+        title = "Proportion of Variance Explained Cond $cond"
+    )
+
+    preds = predict(pca, test_data)
+
+    u = scatter(
+        preds[1,:],
+        preds[2,:],
+        alpha = 0.2,
+        label = nothing,
+        xlabel = "PC 1",
+        ylabel = "PC 2",
+        title = "Projection onto first two PCs Cond $cond truth"
+    )
+
+    savefig(u, joinpath(img_folder, "cond$cond-2pcs.pdf"))
+
+    for state in [8,12,18]
+        dt = reshape(data[[cond, state]], (128, :))
+        pca_state = fit(PCA, dt, maxoutdim=20)
+
+        plot!(
+            t,
+            100cumsum(pca_state.prinvars/ pca_state.tvar),
+            label = state
+        )
+
+        preds_state = predict(pca_state, dt)
+
+        u = scatter(
+            preds_state[1,:],
+            preds_state[2,:],
+            alpha = 0.2,
+            xlabel = "PC 1",
+            ylabel = "PC 2",
+            label = nothing,
+            title = "Projection onto first two PCs Cond $cond State $state"
+        )
+
+        savefig(u, joinpath(img_folder, "cond$cond-state$state-2pcs.pdf"))
+    end
+
+    savefig(t, joinpath(img_folder, "cond$cond-pca.pdf"))
 end
