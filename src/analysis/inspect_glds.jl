@@ -1,4 +1,4 @@
-## Setup
+## Environment and packages
 
 using Pkg
 Pkg.activate("Stats305c", shared=true)
@@ -15,71 +15,107 @@ using Dates
 
 default(fontfamily = "Computer Modern")
 
-## Functions
+ENV["JULIA_PYTHONCALL_EXE"] = "/Users/tomstone/miniforge3/envs/dynamax_env/bin/python"
+ENV["JULIA_CONDAPKG_BACKEND"] = "Null"
 
-softplus(t) = log1p(exp(t))
-positive_diag(v) = diagm(softplus.(v) .+ 1e-4)
+using PythonCall
 
-folder = "gdrive/models/models"
-
-## Example data
-
-x = Pickle.npyload("gdrive/models/models/condition_lds_gaussian_cond1_bin50_state8_iters100_seed7.pkl")
-y = Pickle.npyload("gdrive/models/models/condition_lds_poisson_cond1_bin50_state8_steps100_seed7.pkl")
-
-y["fit"]["trainable_params"]
+pkl = pyimport("pickle")
 
 ## Generating data
 
-function generate_poisson_data(params; T::Int64, ntrials)
-    Σ = positive_diag(params["log_q"])
+p2m(x) = pyconvert(Matrix{Float64}, x)
+p2v(x) = pyconvert(Vector{Float64}, x)
 
-    state = stack(rand(MvNormal(Σ), T, ntrials))
-    state[:,1,:] .= rand(MvNormal(params["m0"], positive_diag(params["log_s0"])), ntrials)
+function params_from_gaussian(x)
+    params = x["fit"]["params"]
+    Σ0 = p2m(params.initial.cov)
+    x0 = p2v(params.initial.mean)
 
-    A = params["A"]
-    for t in 2:T
-        state[:, t, :] .+= A * state[:, t-1, :]
-    end
+    Σ = p2m(params.dynamics.cov)
+    b = p2v(params.dynamics.bias)
+    A = p2m(params.dynamics.weights)
 
-    return rand.(Poisson.(softplus.(stack([params["C"]] .* eachslice(state, dims=3)) .+ params["d"]) .+ 1e-4))
+    C = p2m(params.emissions.weights)
+    d = p2v(params.emissions.bias)
+    R = p2m(params.emissions.cov)
+
+    return (; Σ0, x0, Σ, A, b, C, d, R)
 end
 
-data = Dict()
+data_from_gaussian_pickle(p) = permutedims(stack(pyconvert(Vector{Matrix{Float64}}, p)), (2,1,3))
+
+function generate_gaussian_data(x; T::Int64, ntrials::Int64)
+    Σ0, x0, Σ, A, b, C, d, R = params_from_gaussian(x)
+
+    state = stack(rand(MvNormal(b, Σ), T, ntrials))
+    state[:, 1, :] .= rand(MvNormal(x0, Σ0), ntrials)
+    obs = stack(rand(MvNormal(d, R), T, ntrials))
+
+    for t in 2:T
+        state[:, t, :] .+= A * state[:, t-1, :]
+        obs[:, t, :] .+= C * state[:, t, :]
+    end
+
+    return obs, state
+end
+
+## Loading in Gaussian SSM objects
+
+
+params = Dict()
+y_train = Dict()
+y_test = Dict()
+
 
 for cond in 1:8, state in [8,12,18]
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state$(state)_steps100_seed7.pkl")
+    file = "gdrive/models/models/condition_lds_gaussian_cond$(cond)_bin50_state$(state)_iters100_seed7.pkl"
 
-    pkl = Pickle.npyload(file)
-    params = pkl["fit"]["trainable_params"]
+    _x = pywith(pkl.load, open(file, "r"))
+    params[[cond, state]] = params_from_gaussian(_x)
+    y_train[[cond, state]] = data_from_gaussian_pickle(_x["fit"]["y_train"])
+    y_test[[cond, state]] = data_from_gaussian_pickle(_x["fit"]["y_test"])
+end
 
-    T = size(pkl["fit"]["y_test"][1],1)
-    ntrials = length(pkl["fit"]["y_test"])
-    data[[cond, state]] = generate_poisson_data(params; T, ntrials)
+## Generating data
+
+obsdata = Dict()
+statedata = Dict()
+
+for cond in 1:8, state in [8,12,18]
+    file = "gdrive/models/models/condition_lds_gaussian_cond$(cond)_bin50_state$(state)_iters100_seed7.pkl"
+
+    _x = pywith(pkl.load, open(file, "r"))
+
+    ntrials = length(_x["fit"]["y_test"])
+    T = length(_x["fit"]["y_test"][1])
+
+    obsdata[[cond, state]], statedata[[cond, state]] = generate_gaussian_data(_x; T, ntrials)
 end
 
 ## Visualizing firing rates
 
-img_folder = "gdrive/images/tom/poisson"
+folder = "gdrive/models/models"
+img_folder = "gdrive/images/tom/gaussian"
 
 for cond in 1:8
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
-    pkl = Pickle.npyload(file)
+    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin50_state8_iters100_seed7.pkl")
+    x = pywith(pkl.load, open(file, "r"))
 
-    mean_observed_rates = mean(stack(pkl["fit"]["y_test"]), dims=3)[:,:,1]
+    mean_observed_rates = mean(permutedims(stack(pyconvert(Vector{Matrix{Float64}}, x["fit"]["y_test"])), (2,1,3)), dims=3)[:,:,1]
     p = heatmap(
-        50 .* axes(mean_observed_rates, 1),
+        50 .* axes(mean_observed_rates, 2),
         1:128,
-        mean_observed_rates',
+        mean_observed_rates,
         title = "Mean rate Condition $cond",
         xlabel = "Time (ms)",
         ylabel = "Neuron",
-        clims = (0,10)
+        clims = (0,2)
     )
     savefig(p, joinpath(img_folder, "cond$cond-rate-truth.pdf"))
 
     for state in [8,12,18]
-        mat = mean(data[[cond, state]], dims=3)[:,:,1]
+        mat = mean(obsdata[[cond, state]], dims=3)[:,:,1]
         q = heatmap(
             50 * axes(mat, 2),
             1:128,
@@ -87,18 +123,17 @@ for cond in 1:8
             title = "Sim Condition $cond Nstate $state",
             xlabel = "Time (ms)",
             ylabel = "Neuron",
-            clims = (0,10)
+            clims = (0,2)
         )
         savefig(q, joinpath(img_folder, "cond$cond-state$state-rate.pdf"))
     end
-
 end
 
 for cond in 1:8
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
-    pkl = Pickle.npyload(file)
+    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin50_state8_iters100_seed7.pkl")
+    x = Pickle.npyload(file)
 
-    rate_by_neuron = mean(stack(pkl["fit"]["y_test"]), dims=(1,3))[:]
+    rate_by_neuron = mean(stack(x["fit"]["y_test"]), dims=(1,3))[:]
 
     r = histogram(
         rate_by_neuron,
@@ -108,7 +143,7 @@ for cond in 1:8
     )
     for state in [8,12,18]
         histogram!(
-            mean(data[[cond, state]], dims=(2,3))[:],
+            mean(obsdata[[cond, state]], dims=(2,3))[:],
             label = state,
             alpha = 0.5
         )
@@ -120,9 +155,9 @@ end
 ## Visualizing the transmission matrices
 
 for cond in 1:8, state in [8,12,18]
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state$(state)_steps100_seed7.pkl")
+    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin50_state$(state)_iters100_seed7.pkl")
 
-    A = Pickle.npyload(file)["fit"]["trainable_params"]["A"]
+    A = params_from_gaussian(pywith(pkl.load, open(file, "r"))).A
 
     ev = eigen(A)
 
@@ -142,13 +177,15 @@ for cond in 1:8, state in [8,12,18]
     savefig(s, joinpath(img_folder, "cond$cond-state$state-evals.pdf"))
 end
 
+
 ## Look at PCA of the simulated data and compare
 
 for cond in 1:8
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
-    pkl = Pickle.npyload(file)
+    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin50_state8_iters100_seed7.pkl")
+    x = pywith(pkl.load, open(file, "r"))
 
-    test_data = reduce(hcat, pkl["fit"]["y_test"]')
+    test_data = reduce(hcat, pyconvert(Vector{Matrix{Float64}}, x["fit"]["y_test"])')
+
 
     pca = fit(PCA, test_data, maxoutdim = 20)
 
@@ -177,7 +214,7 @@ for cond in 1:8
 
 
     for state in [8,12,18]
-        dt = reshape(data[[cond, state]], (128, :))
+        dt = reshape(obsdata[[cond, state]], (128, :))
         pca_state = fit(PCA, dt, maxoutdim=20)
 
         plot!(
