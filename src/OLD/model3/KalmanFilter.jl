@@ -1,10 +1,8 @@
 using LinearAlgebra
-using Statistics
-using Distributions
 
 ## Kalman Filter and RTS Smoother
 # Model:
-# z = Normal(Az,Q)
+# z = Normal(Az, Q)
 # x = Normal(Cz, R)
 
 function kalman_filter_smoother(xs::AbstractMatrix{S}; params, stateonly=false, EM=false) where S <: AbstractFloat
@@ -71,15 +69,17 @@ function kalman_filter_smoother(xs::AbstractMatrix{S}; params, stateonly=false, 
 
     # RTS smoother
 
-    μ_t_T[:,    T] .= μ_t_t[:,    T]
-    Σ_t_T[:, :, T] .= Σ_t_t[:, :, T]
-
-    # Terms associated with gain
-
     μ_t_T = Array{S}(undef, D, T)
     Σ_t_T = Array{S}(undef, D, D, T)
 
+    # Term associated with gain
+
     G_t   = Array{S}(undef, D, D)
+
+    # Initialization
+
+    μ_t_T[:,    T] .= μ_t_t[:,    T]
+    Σ_t_T[:, :, T] .= Σ_t_t[:, :, T]
 
     # ------ loop ------
 

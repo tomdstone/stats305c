@@ -25,6 +25,7 @@ pkl = pyimport("pickle")
 ## Generating data
 
 const BIN_SIZE = 50
+const N_NEURON = 128
 
 p2m(x) = pyconvert(Matrix{Float64}, x)
 p2v(x) = pyconvert(Vector{Float64}, x)
@@ -34,21 +35,21 @@ function params_from_gaussian(x)
     Σ0 = p2m(params.initial.cov)
     x0 = p2v(params.initial.mean)
 
-    Σ = p2m(params.dynamics.cov)
-    b = p2v(params.dynamics.bias)
     A = p2m(params.dynamics.weights)
+    b = p2v(params.dynamics.bias)
+    Σ = p2m(params.dynamics.cov)
 
     C = p2m(params.emissions.weights)
     d = p2v(params.emissions.bias)
     R = p2m(params.emissions.cov)
 
-    return (; Σ0, x0, Σ, A, b, C, d, R)
+    return (; Σ0, x0, A, b, Σ, C, d, R)
 end
 
 data_from_gaussian_pickle(p) = permutedims(stack(pyconvert(Vector{Matrix{Float64}}, p)), (2,1,3))
 
 function generate_gaussian_data(x; T::Int64, ntrials::Int64)
-    Σ0, x0, Σ, A, b, C, d, R = params_from_gaussian(x)
+    Σ0, x0, A, b, Σ, C, d, R = params_from_gaussian(x)
 
     state = stack(rand(MvNormal(b, Σ), T, ntrials))
     state[:, 1, :] .= rand(MvNormal(x0, Σ0), ntrials)
@@ -107,7 +108,7 @@ for cond in 1:8
     mean_observed_rates = mean(permutedims(stack(pyconvert(Vector{Matrix{Float64}}, x["fit"]["y_test"])), (2,1,3)), dims=3)[:,:,1]
     p = heatmap(
         BIN_SIZE .* axes(mean_observed_rates, 2),
-        1:128,
+        1:N_NEURON,
         mean_observed_rates,
         title = "Mean rate Condition $cond",
         xlabel = "Time (ms)",
@@ -120,7 +121,7 @@ for cond in 1:8
         mat = mean(obsdata[[cond, state]], dims=3)[:,:,1]
         q = heatmap(
             BIN_SIZE * axes(mat, 2),
-            1:128,
+            1:N_NEURON,
             mat,
             title = "Sim Condition $cond Nstate $state",
             xlabel = "Time (ms)",
@@ -216,7 +217,7 @@ for cond in 1:8
 
 
     for state in [8,12,18]
-        dt = reshape(obsdata[[cond, state]], (128, :))
+        dt = reshape(obsdata[[cond, state]], (N_NEURON, :))
         pca_state = fit(PCA, dt, maxoutdim=20)
 
         plot!(

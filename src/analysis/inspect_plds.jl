@@ -23,6 +23,7 @@ positive_diag(v) = diagm(softplus.(v) .+ 1e-4)
 folder = "gdrive/models/models"
 
 const BIN_SIZE = 50
+const N_NEURON = 128
 
 ## Example data
 
@@ -71,7 +72,7 @@ for cond in 1:8
     mean_observed_rates = mean(stack(_x["fit"]["y_test"]), dims=3)[:,:,1]
     p = heatmap(
         BIN_SIZE .* axes(mean_observed_rates, 1),
-        1:128,
+        1:N_NEURON,
         mean_observed_rates',
         title = "Mean rate Condition $cond",
         xlabel = "Time (ms)",
@@ -84,7 +85,7 @@ for cond in 1:8
         mat = mean(data[[cond, state]], dims=3)[:,:,1]
         q = heatmap(
             BIN_SIZE * axes(mat, 2),
-            1:128,
+            1:N_NEURON,
             mat,
             title = "Sim Condition $cond Nstate $state",
             xlabel = "Time (ms)",
@@ -179,7 +180,7 @@ for cond in 1:8
 
 
     for state in [8,12,18]
-        dt = reshape(data[[cond, state]], (128, :))
+        dt = reshape(data[[cond, state]], (N_NEURON, :))
         pca_state = fit(PCA, dt, maxoutdim=20)
 
         plot!(
