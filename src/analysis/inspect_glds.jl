@@ -24,6 +24,8 @@ pkl = pyimport("pickle")
 
 ## Generating data
 
+const BIN_SIZE = 50
+
 p2m(x) = pyconvert(Matrix{Float64}, x)
 p2v(x) = pyconvert(Vector{Float64}, x)
 
@@ -69,7 +71,7 @@ y_test = Dict()
 
 
 for cond in 1:8, state in [8,12,18]
-    file = "gdrive/models/models/condition_lds_gaussian_cond$(cond)_bin50_state$(state)_iters100_seed7.pkl"
+    file = "gdrive/models/models/condition_lds_gaussian_cond$(cond)_bin$(BIN_SIZE)_state$(state)_iters100_seed7.pkl"
 
     _x = pywith(pkl.load, open(file, "r"))
     params[[cond, state]] = params_from_gaussian(_x)
@@ -83,7 +85,7 @@ obsdata = Dict()
 statedata = Dict()
 
 for cond in 1:8, state in [8,12,18]
-    file = "gdrive/models/models/condition_lds_gaussian_cond$(cond)_bin50_state$(state)_iters100_seed7.pkl"
+    file = "gdrive/models/models/condition_lds_gaussian_cond$(cond)_bin$(BIN_SIZE)_state$(state)_iters100_seed7.pkl"
 
     _x = pywith(pkl.load, open(file, "r"))
 
@@ -99,12 +101,12 @@ folder = "gdrive/models/models"
 img_folder = "gdrive/images/tom/gaussian"
 
 for cond in 1:8
-    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin50_state8_iters100_seed7.pkl")
+    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin$(BIN_SIZE)_state8_iters100_seed7.pkl")
     x = pywith(pkl.load, open(file, "r"))
 
     mean_observed_rates = mean(permutedims(stack(pyconvert(Vector{Matrix{Float64}}, x["fit"]["y_test"])), (2,1,3)), dims=3)[:,:,1]
     p = heatmap(
-        50 .* axes(mean_observed_rates, 2),
+        BIN_SIZE .* axes(mean_observed_rates, 2),
         1:128,
         mean_observed_rates,
         title = "Mean rate Condition $cond",
@@ -117,7 +119,7 @@ for cond in 1:8
     for state in [8,12,18]
         mat = mean(obsdata[[cond, state]], dims=3)[:,:,1]
         q = heatmap(
-            50 * axes(mat, 2),
+            BIN_SIZE * axes(mat, 2),
             1:128,
             mat,
             title = "Sim Condition $cond Nstate $state",
@@ -130,7 +132,7 @@ for cond in 1:8
 end
 
 for cond in 1:8
-    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin50_state8_iters100_seed7.pkl")
+    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin$(BIN_SIZE)_state8_iters100_seed7.pkl")
     x = Pickle.npyload(file)
 
     rate_by_neuron = mean(stack(x["fit"]["y_test"]), dims=(1,3))[:]
@@ -155,7 +157,7 @@ end
 ## Visualizing the transmission matrices
 
 for cond in 1:8, state in [8,12,18]
-    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin50_state$(state)_iters100_seed7.pkl")
+    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin$(BIN_SIZE)_state$(state)_iters100_seed7.pkl")
 
     A = params_from_gaussian(pywith(pkl.load, open(file, "r"))).A
 
@@ -181,7 +183,7 @@ end
 ## Look at PCA of the simulated data and compare
 
 for cond in 1:8
-    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin50_state8_iters100_seed7.pkl")
+    file = joinpath(folder, "condition_lds_gaussian_cond$(cond)_bin$(BIN_SIZE)_state8_iters100_seed7.pkl")
     x = pywith(pkl.load, open(file, "r"))
 
     test_data = reduce(hcat, pyconvert(Vector{Matrix{Float64}}, x["fit"]["y_test"])')

@@ -22,10 +22,12 @@ positive_diag(v) = diagm(softplus.(v) .+ 1e-4)
 
 folder = "gdrive/models/models"
 
+const BIN_SIZE = 50
+
 ## Example data
 
-x = Pickle.npyload("gdrive/models/models/condition_lds_gaussian_cond1_bin50_state8_iters100_seed7.pkl")
-y = Pickle.npyload("gdrive/models/models/condition_lds_poisson_cond1_bin50_state8_steps100_seed7.pkl")
+x = Pickle.npyload("gdrive/models/models/condition_lds_gaussian_cond1_bin$(BIN_SIZE)_state8_iters100_seed7.pkl")
+y = Pickle.npyload("gdrive/models/models/condition_lds_poisson_cond1_bin$(BIN_SIZE)_state8_steps100_seed7.pkl")
 
 y["fit"]["trainable_params"]
 
@@ -48,13 +50,13 @@ end
 data = Dict()
 
 for cond in 1:8, state in [8,12,18]
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state$(state)_steps100_seed7.pkl")
+    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin$(BIN_SIZE)_state$(state)_steps100_seed7.pkl")
 
-    pkl = Pickle.npyload(file)
-    params = pkl["fit"]["trainable_params"]
+    _x = Pickle.npyload(file)
+    params = _x["fit"]["trainable_params"]
 
-    T = size(pkl["fit"]["y_test"][1],1)
-    ntrials = length(pkl["fit"]["y_test"])
+    T = size(_x["fit"]["y_test"][1],1)
+    ntrials = length(_x["fit"]["y_test"])
     data[[cond, state]] = generate_poisson_data(params; T, ntrials)
 end
 
@@ -63,12 +65,12 @@ end
 img_folder = "gdrive/images/tom/poisson"
 
 for cond in 1:8
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
-    pkl = Pickle.npyload(file)
+    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin$(BIN_SIZE)_state8_steps100_seed7.pkl")
+    _x = Pickle.npyload(file)
 
-    mean_observed_rates = mean(stack(pkl["fit"]["y_test"]), dims=3)[:,:,1]
+    mean_observed_rates = mean(stack(_x["fit"]["y_test"]), dims=3)[:,:,1]
     p = heatmap(
-        50 .* axes(mean_observed_rates, 1),
+        BIN_SIZE .* axes(mean_observed_rates, 1),
         1:128,
         mean_observed_rates',
         title = "Mean rate Condition $cond",
@@ -81,7 +83,7 @@ for cond in 1:8
     for state in [8,12,18]
         mat = mean(data[[cond, state]], dims=3)[:,:,1]
         q = heatmap(
-            50 * axes(mat, 2),
+            BIN_SIZE * axes(mat, 2),
             1:128,
             mat,
             title = "Sim Condition $cond Nstate $state",
@@ -95,10 +97,10 @@ for cond in 1:8
 end
 
 for cond in 1:8
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
-    pkl = Pickle.npyload(file)
+    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin$(BIN_SIZE)_state8_steps100_seed7.pkl")
+    _x = Pickle.npyload(file)
 
-    rate_by_neuron = mean(stack(pkl["fit"]["y_test"]), dims=(1,3))[:]
+    rate_by_neuron = mean(stack(_x["fit"]["y_test"]), dims=(1,3))[:]
 
     r = histogram(
         rate_by_neuron,
@@ -120,7 +122,7 @@ end
 ## Visualizing the transmission matrices
 
 for cond in 1:8, state in [8,12,18]
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state$(state)_steps100_seed7.pkl")
+    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin$(BIN_SIZE)_state$(state)_steps100_seed7.pkl")
 
     A = Pickle.npyload(file)["fit"]["trainable_params"]["A"]
 
@@ -145,10 +147,10 @@ end
 ## Look at PCA of the simulated data and compare
 
 for cond in 1:8
-    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin50_state8_steps100_seed7.pkl")
-    pkl = Pickle.npyload(file)
+    file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin$(BIN_SIZE)_state8_steps100_seed7.pkl")
+    _x = Pickle.npyload(file)
 
-    test_data = reduce(hcat, pkl["fit"]["y_test"]')
+    test_data = reduce(hcat, _x["fit"]["y_test"]')
 
     pca = fit(PCA, test_data, maxoutdim = 20)
 
