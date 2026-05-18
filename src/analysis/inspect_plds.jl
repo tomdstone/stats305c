@@ -20,6 +20,7 @@ default(fontfamily = "Computer Modern")
 softplus(t) = log1p(exp(t))
 positive_diag(v) = diagm(softplus.(v) .+ 1e-4)
 
+img_folder = "gdrive/images/tom/poisson"
 folder = "gdrive/models/models"
 
 const BIN_SIZE = 50
@@ -63,7 +64,6 @@ end
 
 ## Visualizing firing rates
 
-img_folder = "gdrive/images/tom/poisson"
 
 for cond in 1:8
     file = joinpath(folder, "condition_lds_poisson_cond$(cond)_bin$(BIN_SIZE)_state8_steps100_seed7.pkl")
@@ -217,3 +217,96 @@ for cond in 1:8
     savefig(u, joinpath(img_folder, "cond$cond-2pcs-all.pdf"))
     savefig(t, joinpath(img_folder, "cond$cond-pca.pdf"))
 end
+
+## Pooled LDS
+
+pooled_models = Dict(
+    i => Pickle.npyload("gdrive/models/models/pooled_lds_poisson_bin50_state$(i)_steps100_seed7.pkl")
+    for i in [8,12,18]
+)
+
+data_dict = Dict(
+    i => generate_poisson_data(
+        pooled_models[i]["fit"]["trainable_params"],
+        T = 6000 ÷ 50,
+        ntrials = 100
+    ) for i in [8,12,18]
+)
+
+
+
+for state in [8,12,18]
+    file = joinpath(folder, "pooled_lds_poisson_bin$(BIN_SIZE)_state$(state)_steps100_seed7.pkl")
+
+    A = Pickle.npyload(file)["fit"]["trainable_params"]["A"]
+
+    ev = eigen(A)
+
+    s = scatter(
+        real(ev.values),
+        imag(ev.values),
+        label = nothing,
+        title = "Eigenvalues Pooled state $state",
+    )
+    plot!(
+        s,
+        cos.(range(0,2π, length=1000)),
+        sin.(range(0,2π, length=1000)),
+        label = nothing,
+        aspectratio=1
+    )
+    savefig(s, joinpath(img_folder, "pooled-state$state-evals.pdf"))
+end
+
+pca = fit(PCA, reduce(hcat, pooled_models[8]["fit"]["y_test"]'), maxoutdim = 20)
+
+t = plot(
+    100cumsum(pca.prinvars / pca.tvar),
+    ylims = (0,100),
+    xlabel = "Principal Component",
+    ylabel = "Percent Variance Explained",
+    label = "Ground Truth",
+    title = "Proportion of Variance Explained "
+)
+
+preds = predict(pca, reduce(hcat, pooled_models[8]["fit"]["y_test"]'))
+
+u = scatter(
+    preds[1,:],
+    preds[2,:],
+    alpha = 0.03,
+    label = "Truth",
+    xlabel = "PC 1",
+    ylabel = "PC 2",
+    title = "Projection onto first two PCs"
+)
+
+savefig(u, joinpath(folder, "pooled-2pcs.pdf"))
+
+for state in [8,12,18]
+    model = pooled_models[state]
+    data = data_dict[state]
+
+    dt = reshape(data_dict[state], (N_NEURON, :))
+    pca_fit = fit(PCA, dt, maxoutdim = 20)
+
+    plot!(
+        t,
+        100cumsum(pca_fit.prinvars / pca_fit.tvar),
+        label = state
+    )
+
+    preds_orig = predict(pca, dt)
+
+    scatter!(
+        u,
+        preds_orig[1,:],
+        preds_orig[2,:],
+        label = state,
+        alpha = 0.03
+    )
+end
+
+
+savefig(t, joinpath(folder, "pooled-pca.pdf"))
+savefig(u, joinpath(folder, "pooled-2pcs-all.pdf"))

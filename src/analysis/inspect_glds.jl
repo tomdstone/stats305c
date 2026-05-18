@@ -254,3 +254,7 @@ for cond in 1:8
     savefig(u, joinpath(img_folder, "cond$cond-2pcs-all.pdf"))
     savefig(t, joinpath(img_folder, "cond$cond-pca.pdf"))
 end
+
+## Pooled GLDS
+
+_y = pywith(pkl.load, open("gdrive/models/models/pooled_lds_gaussian_bin50_state8_iters100_seed7.pkl", "r"))

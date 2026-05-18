@@ -1,4 +1,5 @@
 include("KalmanFilter.jl")
+using Distributions
 
 function kfs_matmul(xs::AbstractMatrix{S}; params, EM = true) where S <: AbstractFloat
     A = params.A
@@ -102,9 +103,11 @@ end
 
 ## Testing using oscillator model
 
+fs = 200
+
 A = zeros(Float64, 4, 4)
-A[1:2,1:2] .= 0.95 * [cospi(2 * 10 / 200) -sinpi(2* 10 / 200); sinpi(2 * 10 / 200) cospi(2*10*200)]
-A[3:4,3:4] .= 0.99 * [cospi(2 * 60 / 200) -sinpi(2* 60 / 200); sinpi(2 * 60 / 200) cospi(2*60*200)]
+A[1:2,1:2] .= 0.95 * [cospi(2 * 10 / fs) -sinpi(2* 10 / fs); sinpi(2 * 10 / fs) cospi(2*10 / fs)]
+A[3:4,3:4] .= 0.99 * [cospi(2 * 60 / fs) -sinpi(2* 60 / fs); sinpi(2 * 60 / fs) cospi(2*60 / fs)]
 
 Q = I(4)
 C = [1. 0. 1. 0.]
