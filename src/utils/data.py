@@ -5,15 +5,21 @@ import numpy as np
 
 
 def load_mc_pacman_data():
+    """Load the MC Pac-Man pickle.
+
+    Returns:
+        Object stored at $DATA/stats-305c-data/mc_pacman.pkl, usually a dict.
+    """
     data_path = Path(os.environ["DATA"]) / "stats-305c-data/mc_pacman.pkl"
     with data_path.open("rb") as f:
         return pickle.load(f)
 
 
 def print_data_structure(data):
-    """
-    Prints a descriptive summary of the data structure.
-    Useful for inspecting large pickle files without printing all contents.
+    """Print a compact summary of a loaded data object.
+
+    Args:
+        data: Expected to be a dict mapping names to arrays, lists, or scalars.
     """
     if not isinstance(data, dict):
         print(f"Data is not a dictionary. Type: {type(data)}")
