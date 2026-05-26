@@ -20,7 +20,7 @@ default(fontfamily = "Computer Modern")
 softplus(t) = log1p(exp(t))
 positive_diag(v) = diagm(softplus.(v) .+ 1e-4)
 
-img_folder = "gdrive/images/tom/poisson"
+img_folder = "gdrive/images/tom/poisson/pooled_input"
 folder = "gdrive/models/models"
 
 const BIN_SIZE = 50
@@ -33,7 +33,7 @@ _y = Pickle.npyload("gdrive/models/models/pooled_lds_poisson_bin50_state8_steps1
 
 ## Functions for generating data
 
-function generate_poisson_data(params, input)
+function gen_poisson_with_input(params, input)
     T, ntrials = size(input)
 
     Σ = positive_diag(params["log_q"])
@@ -55,19 +55,21 @@ end
 
 ## Generating data per condition
 
+Random.seed!(1)
+
 data = Dict()
 
-for state in [8,18]
+for state in [2,4,6,8,18]
     fitted = Pickle.npyload("gdrive/models/pooled_input_lds_poisson_bin50_state$(state)_steps100_seed7.pkl")["fit"]
 
     for cond in 1:8
-        data[[cond, state]] = generate_poisson_data(fitted["trainable_params"], reduce(hcat, fitted["u_test"][fitted["condition_test"] .== cond]))
+        data[[cond, state]] = gen_poisson_with_input(fitted["trainable_params"], reduce(hcat, fitted["u_test"][fitted["condition_test"] .== cond]))
     end
 end
 
 ## Visualizing firing rates
 
-for cond in 1:8,state in [8,18]
+for cond in 1:8,state in [2,4,6,8,18]
     mat = mean(data[[cond, state]], dims=3)[:,:,1]
 
     q = heatmap(
