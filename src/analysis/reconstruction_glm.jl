@@ -16,7 +16,7 @@ using KernelDensity
 using DSP
 using GLM
 
-default(fontfamily = "Computer Modern")
+default(fontfamily = "Computer Modern", dpi = 600)
 
 ## Loading data
 
@@ -147,6 +147,7 @@ end
 
 
 h = histogram(r2s[1][:], label = nothing, dpi = 600, title = "Force encoding R-squared values")
+savefig(h, "gdrive/final/images/force_encoding_hist.png")
 
 ## Doing GLM on each force trial, not just the average across trials
 
